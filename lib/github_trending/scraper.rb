@@ -65,8 +65,9 @@ module Github
           _project = content.css(".repo")
           _rank = content.css(".leaderboard-list-rank")
 
+          user.full_name   = content.children[7].css(".user-leaderboard-list-name").text.gsub("\n", '').strip
           user.name        = _user.attr("href").split("/").last
-          user.url         = BASE_HOST + _user.children[1].attr("href")
+          user.url         = BASE_HOST + "/#{user.name}"
 
           user.repo = _project.attr("title").text
           user.repo_description = content.css(".repo-snipit-description").text.gsub("\n", '').strip
