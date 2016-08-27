@@ -4,9 +4,14 @@ require 'addressable/uri'
 
 module Github
   module Trending
-    def self.get(language = nil, since = nil)
+    def self.get_projects(language = nil, since = nil)
       scraper = Github::Trending::Scraper.new
-      scraper.get(language, since)
+      scraper.get_projects(language, since)
+    end
+
+    def self.get_users(language = nil, since = nil)
+      scraper = Github::Trending::Scraper.new
+      scraper.get_users(language, since)
     end
 
     def self.languages
@@ -23,6 +28,7 @@ module Github
     class Scraper
       BASE_HOST = 'https://github.com'
       BASE_URL = "#{BASE_HOST}/trending"
+      DEV_URL = "#{BASE_URL}/developers"
 
       def initialize
         @agent = Mechanize.new
@@ -31,9 +37,9 @@ module Github
         @agent.set_proxy(proxy.host, proxy.port, proxy.user, proxy.password) if proxy
       end
 
-      def get(language = nil, since = nil)
+      def get_projects(language = nil, since = nil)
         projects = []
-        page = @agent.get(generate_url_for_get(language, since))
+        page = @agent.get(generate_url_for_get_project(language, since))
 
         page.search('.repo-list-item').each do |content|
           project = Project.new
@@ -48,10 +54,32 @@ module Github
         projects
       end
 
+      def get_users(language = nil, since = nil)
+        users = []
+        page = @agent.get(generate_url_for_get_user(language, since))
+
+        page.search('.user-leaderboard-list-item').each do |content|
+          user = User.new
+
+          _user = content.css('.user-leaderboard-list-name')
+          _project = content.css(".repo")
+
+          user.name        = _user.children[1].text.strip
+          user.url         = BASE_HOST + _user.children[1].attr("href")
+
+          user.repo = _project.attr("title").text
+          user.repo_description = content.css(".repo-snipit-description").text.gsub("\n", '').strip
+
+          users << user
+        end
+        fail ScrapeException if users.empty?
+        users
+      end
+
       def list_languages
         languages = []
         page = @agent.get(BASE_URL)
-        page.search('div.select-menu-item a').each do |content|
+        page.search('ul.language-filter-list a').each do |content|
           href = content.attributes['href'].value
           # objective-c++ =>
           language = href.match(/github.com\/trending\?l=(.+)/).to_a[1]
@@ -62,7 +90,7 @@ module Github
 
       private
 
-      def generate_url_for_get(language, since)
+      def generate_url_for_get_project(language, since)
         language = language.to_s.gsub('_', '-') if language
 
         if since
@@ -76,6 +104,26 @@ module Github
         end
 
         uri = Addressable::URI.parse(BASE_URL)
+        if language || since
+          uri.query_values = { l: language, since: since }.delete_if { |_k, v| v.nil? }
+        end
+        uri.to_s
+      end
+
+      def generate_url_for_get_user(language, since)
+        language = language.to_s.gsub('_', '-') if language
+
+        if since
+          since =
+            case since.to_sym
+              when :d, :day,   :daily   then 'daily'
+              when :w, :week,  :weekly  then 'weekly'
+              when :m, :month, :monthly then 'monthly'
+              else nil
+            end
+        end
+
+        uri = Addressable::URI.parse(DEV_URL)
         if language || since
           uri.query_values = { l: language, since: since }.delete_if { |_k, v| v.nil? }
         end
