@@ -61,11 +61,11 @@ module Github
         page.search('.user-leaderboard-list-item').each do |content|
           user = User.new
 
-          _user = content.css('.user-leaderboard-list-name')
+          _user = content.children[3]
           _project = content.css(".repo")
           _rank = content.css(".leaderboard-list-rank")
 
-          user.name        = _user.children[1].text.strip
+          user.name        = _user.attr("href").split("/").last
           user.url         = BASE_HOST + _user.children[1].attr("href")
 
           user.repo = _project.attr("title").text
